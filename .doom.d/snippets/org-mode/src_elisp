@@ -1,0 +1,8 @@
+# -*- mode: snippet -*-
+# name: src_elisp
+# key: <el
+# expand-env: ((yas-after-exit-snippet-hook #'org-edit-special))
+# --
+#+BEGIN_SRC elisp
+$0
+#+END_SRC
