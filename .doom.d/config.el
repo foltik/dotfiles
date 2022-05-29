@@ -102,6 +102,7 @@
 
       :desc "Copy this file" "c" #'doom/copy-this-file
       :desc "Delete this file" "d" #'doom/delete-this-file
+      :desc "Delete file" "D" #'delete-file
       :desc "Move this file" "m" #'doom/move-this-file
       :desc "Revert this file" "l" #'revert-buffer
 
