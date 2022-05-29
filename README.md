@@ -1,5 +1,5 @@
 # Dotfiles
-Dotfiles management, entirely within git.
+Dotfiles management entirely within a bare git repo, with [git-crypt](https://github.com/AGWA/git-crypt) for transparent GPG-based file encryption.
 
 ## Installation
 ```shell
