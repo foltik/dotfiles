@@ -217,11 +217,12 @@ Unmap a bunch of the default keybindings.
   (projectile-invalidate-cache nil)
   (+ivy/projectile-find-file))
 #+END_SRC
+
 **** Buffers
 #+BEGIN_SRC elisp
 (map! :leader
       :desc "Switch buffer" "," #'+vertico/switch-workspace-buffer
-      :desc "Switch all buffers"  ">" #'consult-buffer)
+      :desc "Switch all buffers"  "<" #'consult-buffer)
 #+END_SRC
 
 **** Search
@@ -408,7 +409,7 @@ keybindings specific to =config.org=.
 #+BEGIN_SRC elisp
 (map! :leader
       :prefix ("p" . "projects")
-      :desc "Switch project" "p" #'counsel-projectile-switch-project
+      :desc "Switch project" "p" #'my/projectile-switch-project
       :desc "Add new project" "a" #'projectile-add-known-project
       :desc "Remove project" "d" #'projectile-remove-known-project
 
@@ -731,7 +732,21 @@ Setup: run =M-x dap-go-setup=
 #+BEGIN_SRC elisp
 ;; (setq projectile-project-search-path
 ;;       '("~/Code"))
+
+(defun my/projectile-switch-project ()
+  (interactive)
+  ;; Prune projects which no longer exist
+  (dolist (project projectile-known-projects)
+    (unless (file-directory-p project)
+      (projectile-remove-known-project project)))
+  (call-interactively #'counsel-projectile-switch-project))
 #+END_SRC
+
+** LSP
+#+BEGIN_SRC elisp
+(setq lsp-ui-doc-show-with-mouse t)
+#+END_SRC
+
 ** Counsel Search
 #+BEGIN_SRC elisp
 (defun my/counsel-search ()

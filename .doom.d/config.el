@@ -150,7 +150,7 @@
 
 (map! :leader
       :desc "Switch buffer" "," #'+vertico/switch-workspace-buffer
-      :desc "Switch all buffers"  ">" #'consult-buffer)
+      :desc "Switch all buffers"  "<" #'consult-buffer)
 
 (map! :leader
       :desc "Search online" "/" #'my/counsel-search)
@@ -301,7 +301,7 @@
 
 (map! :leader
       :prefix ("p" . "projects")
-      :desc "Switch project" "p" #'counsel-projectile-switch-project
+      :desc "Switch project" "p" #'my/projectile-switch-project
       :desc "Add new project" "a" #'projectile-add-known-project
       :desc "Remove project" "d" #'projectile-remove-known-project
 
@@ -580,6 +580,16 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
 
 ;; (setq projectile-project-search-path
 ;;       '("~/Code"))
+
+(defun my/projectile-switch-project ()
+  (interactive)
+  ;; Prune projects which no longer exist
+  (dolist (project projectile-known-projects)
+    (unless (file-directory-p project)
+      (projectile-remove-known-project project)))
+  (call-interactively #'counsel-projectile-switch-project))
+
+(setq lsp-ui-doc-show-with-mouse t)
 
 (defun my/counsel-search ()
   (interactive)
