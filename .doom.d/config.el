@@ -1,5 +1,77 @@
 (doom-load-envvars-file (concat doom-private-dir "env.el"))
 
+(setq doom-modeline-major-mode-icon t)
+
+(defun my/line ()
+  (buffer-substring-no-properties
+   (line-beginning-position)
+   (line-end-position)))
+
+(defun my/line-match-p (regexp)
+  (string-match-p regexp (my/line)))
+
+(defun my/insert-mode-p ()
+  (eq evil-state 'insert))
+(defun my/normal-mode-p ()
+  (eq evil-state 'normal))
+
+(defun my/kbd-replace (str)
+  "Convert STR into a keyboard macro string by replacing terminal key sequences with GUI keycodes."
+  (let ((kbd-regex '(("ESC" . "<escape>")
+                     ("DEL" . "<delete>" )
+                     ("BS"  . "<backspace>")
+                     ("RET" . "<return>")
+                     ("SPC" . "<SPC>")
+                     ("TAB" . "<tab>"))))
+    (my/replace-regexps-in-string str kbd-regex)))
+
+(setq my//kbd-p nil)
+(defun my/kbd!-p () (eq my//kbd-p t))
+
+(defun kbd! (str)
+  "Execute the key sequence defined by STR like a VIM macro."
+  (let ((minibuffer-message-timeout 0))
+    (setq my//kbd-p t)
+    (execute-kbd-macro (read-kbd-macro (my/kbd-replace str)))
+    (setq my//kbd-p nil)))
+
+(defun my/buffer-local-set-key (key fn)
+  (let ((mode (intern (format "%s-local-mode"     (buffer-name))))
+        (map  (intern (format "%s-local-mode-map" (buffer-name)))))
+    (unless (boundp map)
+      (set map (make-sparse-keymap))
+      (evil-make-overriding-map map 'normal))
+    (eval
+     `(define-minor-mode ,mode
+        "A minor mode for buffer-local keybinds."
+        :keymap ,map))
+    (eval
+     `(define-key ,map ,key #',fn))
+    (funcall mode t)))
+
+(defun my/replace-regexps-in-string (str regexps)
+  "Replace all pairs of (regex . replacement) defined by REGEXPS in STR."
+  (if (null regexps)
+      str
+    (my/replace-regexps-in-string
+     (replace-regexp-in-string (caar regexps) (cdar regexps) str t)
+     (cdr regexps))))
+
+(setq auth-sources '("~/.authinfo.gpg"))
+
+(use-package auth-source :commands auth-source-search)
+
+(defmacro my/with-credential (query name &rest body)
+  "Evaluates BODY with NAME bound as the secret from AUTH-SOURCES matching criteria QUERY."
+  `
+  (let* ((entry (nth 0 (auth-source-search ,@query)))
+         (,name (when entry
+                  (let ((secret (plist-get entry :secret)))
+                    (if (functionp secret)
+                        (funcall secret)
+                      secret)))))
+    ,@body))
+
 (setq doom-theme 'doom-catppuccin)
 
 (setq doom-font                (font-spec :family "monospace" :size 13)
@@ -41,7 +113,8 @@
       "f" nil
       "h" nil
       "p" nil
-      "t" nil)
+      "t" nil
+      "w" nil)
 
 (map! :map evil-org-mode-map
   :n "zc" nil)
@@ -80,7 +153,7 @@
       :desc "Switch all buffers"  ">" #'consult-buffer)
 
 (map! :leader
-      :desc "Search online" "/" #'counsel-search)
+      :desc "Search online" "/" #'my/counsel-search)
 
 (map! :leader
       :prefix ("b" . "buffers")
@@ -157,6 +230,8 @@
       :desc "Help info" "h" #'info
       :desc "Help for help" "H" #'help-for-help
 
+      :desc "Describe mode" "m" #'describe-mode
+      :desc "Describe minor modes" "M" #'doom/describe-active-minor-mode
       :desc "Describe function" "f" #'counsel-describe-function
       :desc "Describe function key" "F" #'where-is
       :desc "Describe variable" "v" #'counsel-describe-variable
@@ -219,7 +294,7 @@
       :desc "Doom news" "n" #'doom/help-news
       :desc "Doom help search" "/" #'doom/help-search-headings
 
-      :desc "Doom version" #'doom/version
+      :desc "Doom version" "v" #'doom/version
 
       :desc "Doom package configuration" "p" #'doom/help-package-config
       :desc "Doom sandbox" "x" #'doom/sandbox)
@@ -251,6 +326,7 @@
       :desc "Line Wrap"      "w" #'visual-line-mode
       ;; Modes
       :desc "Flycheck" "f" #'flycheck-mode
+      :desc "Keycast"  "k" #'keycast-mode
       ;; Files
       :desc "Read-only" "r" #'read-only-mode)
 
@@ -505,18 +581,45 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
 ;; (setq projectile-project-search-path
 ;;       '("~/Code"))
 
-(let ((found (nth 0 (auth-source-search :host "kagi.com"))))
-  (when found
-    (let ((token (plist-get found :secret)))
-      (when (functionp token)
-        (setq token (funcall token)))
-      (add-to-list
-       'counsel-search-engines-alist
-       `(kagi
-         "https://duckduckgo.com/ac/"
-         ,(format "https://kagi.com/search?token=%s&q=" token)
-         counsel--search-request-data-ddg))
-      (setq counsel-search-engine 'kagi))))
+(defun my/counsel-search ()
+  (interactive)
+  (unless (boundp 'my/kagi-found)
+    (my/with-credential
+     (:host "kagi.com") token
+     (if token
+         (progn
+           (setq my/kagi-found (if token t nil))
+           (setq counsel-search-engines-alist
+                 `((kagi
+                    "https://duckduckgo.com/ac/"
+                    ,(format "https://kagi.com/search?token=%s&q=" token)
+                    counsel--search-request-data-ddg)))
+           (setq counsel-search-engine 'kagi))
+       (warn "Token for kagi.com not found in authinfo. Falling back to default search engine."))))
+  (call-interactively #'counsel-search))
+
+(after! keycast
+  (define-minor-mode keycast-mode
+    "Show current command and its key binding in the mode line."
+    :global t
+    (if keycast-mode
+        (progn
+          (add-to-list 'global-mode-string '("" keycast-mode-line))
+          (add-hook 'pre-command-hook 'keycast--update t))
+      (progn
+        (setq global-mode-string (delete '("" keycast-mode-line) global-mode-string))
+        (remove-hook 'pre-command-hook 'keycast--update))))
+
+  (dolist (input '(self-insert-command
+                    org-self-insert-command))
+    (add-to-list 'keycast-substitute-alist `(,input nil)))
+
+  (dolist (event '(mouse-event-p
+                   mouse-movement-p
+                   mwheel-scroll
+                   lsp-ui-doc--handle-mouse-movement
+                   ignore))
+    (add-to-list 'keycast-substitute-alist `(,event nil))))
 
 (load! "lisp/emacs-everywhere.el")
 (setq emacs-everywhere-paste-command '("xdotool" "key" "--clearmodifiers" "ctrl+v"))
@@ -524,58 +627,3 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
       '((title  . "Emacs Everywhere")
         (width  . 120)
         (height . 36)))
-
-(defun my/line ()
-  (buffer-substring-no-properties
-   (line-beginning-position)
-   (line-end-position)))
-
-(defun my/line-match-p (regexp)
-  (string-match-p regexp (my/line)))
-
-(defun my/insert-mode-p ()
-  (eq evil-state 'insert))
-(defun my/normal-mode-p ()
-  (eq evil-state 'normal))
-
-(defun my/kbd-replace (str)
-  "Convert STR into a keyboard macro string by replacing terminal key sequences with GUI keycodes."
-  (let ((kbd-regex '(("ESC" . "<escape>")
-                     ("DEL" . "<delete>" )
-                     ("BS"  . "<backspace>")
-                     ("RET" . "<return>")
-                     ("SPC" . "<SPC>")
-                     ("TAB" . "<tab>"))))
-    (my/replace-regexps-in-string str kbd-regex)))
-
-(setq my//kbd-p nil)
-(defun my/kbd!-p () (eq my//kbd-p t))
-
-(defun kbd! (str)
-  "Execute the key sequence defined by STR like a VIM macro."
-  (let ((minibuffer-message-timeout 0))
-    (setq my//kbd-p t)
-    (execute-kbd-macro (read-kbd-macro (my/kbd-replace str)))
-    (setq my//kbd-p nil)))
-
-(defun my/buffer-local-set-key (key fn)
-  (let ((mode (intern (format "%s-local-mode"     (buffer-name))))
-        (map  (intern (format "%s-local-mode-map" (buffer-name)))))
-    (unless (boundp map)
-      (set map (make-sparse-keymap))
-      (evil-make-overriding-map map 'normal))
-    (eval
-     `(define-minor-mode ,mode
-        "A minor mode for buffer-local keybinds."
-        :keymap ,map))
-    (eval
-     `(define-key ,map ,key #',fn))
-    (funcall mode t)))
-
-(defun my/replace-regexps-in-string (str regexps)
-  "Replace all pairs of (regex . replacement) defined by REGEXPS in STR."
-  (if (null regexps)
-      str
-    (my/replace-regexps-in-string
-     (replace-regexp-in-string (caar regexps) (cdar regexps) str t)
-     (cdr regexps))))

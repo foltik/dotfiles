@@ -50,7 +50,10 @@
 ;(unpin! t)
 
 (package! emacs-everywhere :ignore t)
+
 (package! doom-snippets :ignore t)
+
+(package! keycast)
 
 (package! copilot
   :recipe (:host github :repo "zerolfx/copilot.el"
