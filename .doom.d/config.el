@@ -90,6 +90,9 @@
 (add-hook 'evil-insert-state-entry-hook #'my/line-numbers-absolute)
 (add-hook 'evil-insert-state-exit-hook #'my/line-numbers-relative)
 
+(global-undo-tree-mode)
+(add-hook 'evil-local-mode-hook 'turn-on-undo-tree-mode)
+
 (use-package copilot
   :commands (copilot-complete))
 
@@ -126,11 +129,30 @@
 (map!
  :desc "Copilot" :i "C-," #'my/copilot-complete)
 
+(map!
+ :desc "Show docs" :ni "C-/" #'my/lsp-ui-doc-open)
 
+(map! :map lsp-ui-doc-frame-mode-map
+      :n "q" #'my/lsp-ui-doc-close
+      :n "<escape>" #'my/lsp-ui-doc-close)
+(after! lsp-ui
+  (evil-make-overriding-map lsp-ui-doc-frame-mode-map 'normal))
 
 (map! :map minibuffer-mode-map
       :desc "Next history" "C-j" #'next-history-element
       :desc "Prev history" "C-k" #'previous-history-element)
+
+(map!
+ :desc "Save file" "C-s" #'save-buffer)
+
+(map!
+ :desc "Scroll page up"   :ni "C-S-k" #'evil-scroll-up
+ :desc "Scroll line up"   :ni "C-k" #'evil-scroll-line-up
+ :desc "Scroll page down" :ni "C-S-j" #'evil-scroll-down
+ :desc "Scroll line down" :ni "C-j" #'evil-scroll-line-down)
+
+(map!
+ :desc "Undo tree visualizer" "U" #'undo-tree-visualize)
 
 (map! :leader
       :desc "M-x" "x" #'counsel-M-x
@@ -188,6 +210,7 @@
       :prefix ("f s" . "snippets")
       :desc "New snippet"  "n" #'yas-new-snippet
       :desc "Edit snippet" "e" #'yas-visit-snippet-file
+      :desc "Reload snippets" "r" #'yas-reload-all
       :desc "Browse docs"  "?" #'my/yas-browse-docs)
 
 (defun my/yas-browse-docs ()
@@ -377,10 +400,11 @@
 
 (defhydra my/hydra-window-resize ()
   "Resize window"
-  ("=" my/window-increase-height "++Height")
-  ("-" my/window-decrease-height "--Height")
-  ("<" my/window-decrease-width  "--Width")
-  (">" my/window-increase-width  "++Width"))
+  ("k" my/window-increase-height "++Height")
+  ("j" my/window-decrease-height "--Height")
+  ("h" my/window-decrease-width  "--Width")
+  ("l" my/window-increase-width  "++Width")
+  ("ESC" nil "Quit" :color blue))
 
 (map! :map org-config-mode-map
       :localleader
@@ -455,18 +479,27 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
 
 (add-to-list 'projectile-globally-ignored-files "Cargo.lock")
 
+(rx-let ((crate (or alphanumeric "_" "*")))
+  (setq my//rust/import-singular-rx
+        ;; use foo::bar::baz;
+        (rx line-start "use "
+            (+ (+ crate) "::")
+            (+ crate)
+            (? ";") line-end))
+  (setq my//rust/import-plural-rx
+        ;; use foo::bar::baz::{qux::quo,  };
+        (rx line-start "use "
+            (+ (+ crate) "::")
+            "{" (* (+ crate) "::") (+ crate) "," (* whitespace) "}"
+            (? ";") line-end)))
+
 (defun my/rust/import-pluralize ()
   "Convert a singular import into a brace-wrapped plural import."
   (interactive)
   (if (and
        (not (my/kbd!-p))
        (my/insert-mode-p)
-       (my/line-match-p
-        ;; use foo::bar::baz;
-        (rx line-start "use "
-            (+ (+ word) "::")
-            (+ word)
-            (? ";") line-end)))
+       (my/line-match-p my//rust/import-singular-rx))
       (kbd! "ESC vb S} f} i,")
     (insert ",")))
 
@@ -476,12 +509,7 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
   (if (and
        (not (my/kbd!-p))
        (my/insert-mode-p)
-       (my/line-match-p
-        ;; use foo::bar::baz::{qux::quo,};
-        (rx line-start "use "
-            (+ (+ word) "::")
-            "{" (* (+ word) "::") (+ word) ",}"
-            (? ";") line-end)))
+       (my/line-match-p my//rust/import-plural-rx))
       (kbd! "ESC l dF, ds} $i")
     (evil-delete-backward-char-and-join 1)))
 
@@ -491,13 +519,7 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
   (if (and
        (not (my/kbd!-p))
        (my/insert-mode-p)
-       (my/line-match-p
-        ;; use foo::bar::baz::{qux::quo,   };
-        (rx line-start
-            "use "
-            (+ (+ word) "::")
-            "{" (* (+ word) "::") (+ word) "," (* whitespace) "}"
-            (? ";") line-end)))
+       (my/line-match-p my//rust/import-plural-rx))
       (kbd! "ESC l dF, ds} $i")
     (backward-kill-word 1)))
 
@@ -584,12 +606,26 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
 (defun my/projectile-switch-project ()
   (interactive)
   ;; Prune projects which no longer exist
-  (dolist (project projectile-known-projects)
-    (unless (file-directory-p project)
-      (projectile-remove-known-project project)))
+  (when (boundp 'projectile-known-projects)
+    (dolist (project projectile-known-projects)
+      (unless (file-directory-p project)
+        (projectile-remove-known-project project))))
   (call-interactively #'counsel-projectile-switch-project))
 
 (setq lsp-ui-doc-show-with-mouse t)
+
+(setq lsp-headerline-breadcrumb-enable t)
+(setq lsp-headerline-breadcrumb-segments '(symbols))
+
+(defun my/lsp-ui-doc-open ()
+  (interactive)
+  (lsp-ui-doc-show)
+  (lsp-ui-doc-focus-frame))
+
+(defun my/lsp-ui-doc-close ()
+  (interactive)
+  (lsp-ui-doc-unfocus-frame)
+  (lsp-ui-doc-hide))
 
 (defun my/counsel-search ()
   (interactive)

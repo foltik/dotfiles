@@ -33,10 +33,11 @@ gpg-connect-agent updatestartuptty /bye >/dev/null
 # Functions
 #
 
-# Abbreviations
-abbr -a ls  exa
-abbr -a g   git
-abbr -a vim nvim
+# Shorthand
+abbr -a g git
+function ls; exa $argv; end
+function ll; exa -l $argv; end
+function vim; nvim $argv; end
 
 # Dotfiles management
 function dots
