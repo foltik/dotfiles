@@ -1,0 +1,5 @@
+# -*- mode: snippet -*-
+# name: log::debug
+# key: debug
+# --
+log::debug!("$0")

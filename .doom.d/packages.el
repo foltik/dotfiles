@@ -49,12 +49,17 @@
 ;; ...Or *all* packages (NOT RECOMMENDED; will likely break things)
 ;(unpin! t)
 
+;; Don't install emacs-everywhere or doom-snippets
 (package! emacs-everywhere :ignore t)
-
 (package! doom-snippets :ignore t)
 
+;; Utility for making HTTP requests
+(package! request)
+
+;; Mode for showing which keys are being pressed on the modeline
 (package! keycast)
 
+;; GitHub Copilot for Emacs
 (package! copilot
   :recipe (:host github :repo "zerolfx/copilot.el"
            :files ("dist" "copilot.el")))

@@ -1,0 +1,5 @@
+# -*- mode: snippet -*-
+# name: log::warn
+# key: warn
+# --
+log::warn!("$0")

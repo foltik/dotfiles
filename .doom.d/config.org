@@ -1,3 +1,4 @@
+# -*- lexical-binding: t -*-
 #+title: Config
 
 * Setup
@@ -11,6 +12,42 @@
 #+END_SRC
 
 * Lisp
+** Hacks
+#+BEGIN_SRC elisp
+(make-variable-buffer-local 'lexical-binding)
+(setq lexical-binding t)
+#+END_SRC
+
+** Web
+#+BEGIN_SRC elisp
+(use-package request
+  :commands request)
+#+END_SRC
+
+#+BEGIN_SRC elisp
+(defmacro request! (url plist success &optional error)
+  "Makes an HTTP request with `request`, running SUCCESS on success, and
+ERROR on error if specified.
+
+Any arguments of LAMBDA are bound to the corresponding plist keys
+returned by `request`."
+  (let ((handler (lambda (fn)
+                   ;; Wraps a lambda in `cl-function`,
+                   ;; and converts args (foo) into (&key foo &allow-other-keys)
+                   `(cl-function
+                     (lambda
+                       ,(append
+                         (mapcan (lambda (arg) `(&key ,arg))
+                                 (cadr fn))
+                         '(&allow-other-keys))
+                       ,@(cddr fn))))))
+
+    `(request ,url
+       ,@plist
+       :success ,(funcall handler success)
+       ,@(if error `(:error ,(funcall handler error))))))
+#+END_SRC
+
 ** Editing
 #+BEGIN_SRC elisp
 (defun my/line ()
@@ -119,6 +156,38 @@ frame parameter which just landed in the Emacs 29 development branch.
 (setq evil-want-fine-undo t)
 #+END_SRC
 
+Auto center the point after jumping.
+#+BEGIN_SRC elisp
+(defmacro my//center-cmd (name &rest body)
+  `(defun ,name ()
+     (interactive)
+     ,@body
+     (call-interactively #'evil-scroll-line-to-center)))
+
+(my//center-cmd my/scroll-up  (evil-scroll-up evil-scroll-count))
+(my//center-cmd my/scroll-down (evil-scroll-down evil-scroll-count))
+
+(my//center-cmd my/jump-forward  (better-jumper-jump-forward))
+(my//center-cmd my/jump-backward (better-jumper-jump-backward))
+
+(my//center-cmd my/search-next (evil-ex-search-next))
+(my//center-cmd my/search-prev (evil-ex-search-previous))
+
+(my//center-cmd my/forward-paragraph  (evil-forward-paragraph))
+(my//center-cmd my/backward-paragraph (evil-backward-paragraph))
+
+(my//center-cmd my/forward-section-begin (evil-forward-section-begin))
+(my//center-cmd my/forward-section-end (evil-forward-section-end))
+(my//center-cmd my/backward-section-begin (evil-backward-section-begin))
+(my//center-cmd my/backward-section-end (evil-backward-section-end))
+#+END_SRC
+
+#+BEGIN_SRC elisp
+(defun my/duplicate-and-comment-line ()
+  (interactive)
+  (kbd! "yyp k gcc j"))
+#+END_SRC
+
 *** Line Numbers
 Use relative line numbers in normal mode, and absolute line numbers in insert
 mode.
@@ -171,7 +240,8 @@ Unmap a bunch of the default keybindings.
       "h" nil
       "p" nil
       "t" nil
-      "w" nil)
+      "w" nil
+      "c" nil)
 
 (map! :map evil-org-mode-map
   :n "zc" nil)
@@ -182,28 +252,35 @@ Unmap a bunch of the default keybindings.
 #+BEGIN_SRC elisp
 (map!
  :desc "Increase font size" :ni "C-=" #'text-scale-increase
- :desc "Decrease font size" :ni "C--" #'text-scale-decrease)
+ :desc "Decrease font size" :ni "C--" #'text-scale-decrease
+ :desc "Reset font size" :ni "C-+" #'my/text-scale-reset)
+
+(defun my/text-scale-reset ()
+  (interactive)
+  (text-scale-set 0))
 #+END_SRC
 
 *** Copilot
 #+BEGIN_SRC elisp
 (map!
- :desc "Copilot" :i "C-," #'my/copilot-complete)
+ :desc "Copilot" :i "C-?" #'my/copilot-complete)
 #+END_SRC
+
 *** LSP
 #+BEGIN_SRC elisp
-(map!
- :desc "Show docs" :ni "C-/" #'my/lsp-ui-doc-open)
+(map! :map lsp-mode-map
+      :desc "Apply code action" :ni "C-/" #'lsp-execute-code-action
 
-(map! :map lsp-ui-doc-frame-mode-map
-      :n "q" #'my/lsp-ui-doc-close
-      :n "<escape>" #'my/lsp-ui-doc-close)
-(after! lsp-ui
-  (evil-make-overriding-map lsp-ui-doc-frame-mode-map 'normal))
+      :desc "Show definitions" :ni "C-." #'+lookup/definition
+      :desc "Show references" :ni "C->" #'my/lookup/references
+
+      :desc "Jump backward" :ni "C-," #'better-jumper-jump-backward
+      :desc "Jump backward" :ni "C-<" #'better-jumper-jump-forward)
+
+(defun my/lsp/lookup-references ()
+  (interactive)
+  (lsp-treemacs-references t))
 #+END_SRC
-
-#+RESULTS:
-: normal
 
 *** Minibuffer
 #+BEGIN_SRC elisp
@@ -211,25 +288,45 @@ Unmap a bunch of the default keybindings.
       :desc "Next history" "C-j" #'next-history-element
       :desc "Prev history" "C-k" #'previous-history-element)
 #+END_SRC
+
 *** Files
 #+BEGIN_SRC elisp
 (map!
  :desc "Save file" "C-s" #'save-buffer)
 #+END_SRC
+
 *** Evil
 #+BEGIN_SRC elisp
 (map!
- :desc "Scroll page up"   :ni "C-S-k" #'evil-scroll-up
+ :desc "Scroll page up"   :ni "C-S-k" #'my/scroll-up
+ :desc "Scroll page down" :ni "C-S-j" #'my/scroll-down
  :desc "Scroll line up"   :ni "C-k" #'evil-scroll-line-up
- :desc "Scroll page down" :ni "C-S-j" #'evil-scroll-down
- :desc "Scroll line down" :ni "C-j" #'evil-scroll-line-down)
+ :desc "Scroll line down" :ni "C-j" #'evil-scroll-line-down
+
+ :desc "Jump forward"  :n "C-o" #'my/jump-forward
+ :desc "Jump backward" :n "C-o" #'my/jump-backward
+
+ :desc "Search next" :n "n" #'my/search-next
+ :desc "Search prev" :n "N" #'my/search-prev
+
+ :desc "Forward paragraph"  :n "}" #'my/forward-paragraph
+ :desc "Backward paragraph" :n "{" #'my/backward-paragraph
+
+ :desc "Forward section begin" :n "]]" #'my/forward-section-begin
+ :desc "Forward section end"   :n "][" #'my/forward-section-end
+ :desc "Backward section begin" :n "[]" #'my/backward-section-begin
+ :desc "Backward section end"   :n "[[" #'my/backward-section-end)
 #+END_SRC
 
 #+BEGIN_SRC elisp
 (map!
- :desc "Undo tree visualizer" "U" #'undo-tree-visualize)
+ :desc "Undo tree visualizer" :n "U" #'undo-tree-visualize)
 #+END_SRC
 
+#+BEGIN_SRC elisp
+(map!
+ :desc "Duplicate and comment line" :n "gC" #'my/duplicate-and-comment-line)
+#+END_SRC
 ** Leader
 *** Root
 **** Eval
@@ -306,10 +403,13 @@ Unmap a bunch of the default keybindings.
 #+BEGIN_SRC emacs-lisp
 (map! :leader
       :prefix ("f s" . "snippets")
-      :desc "New snippet"  "n" #'yas-new-snippet
-      :desc "Edit snippet" "e" #'yas-visit-snippet-file
-      :desc "Reload snippets" "r" #'yas-reload-all
-      :desc "Browse docs"  "?" #'my/yas-browse-docs)
+      :desc "Find snippet"    "f" #'my/yas-find-snippet
+      :desc "New snippet"     "n" #'yas/new-snippet
+      :desc "Edit snippet"    "e" #'my/yas-edit-snippet
+
+      :desc "Describe snippets" "d" #'yas/describe-tables
+      :desc "Reload snippets" "r" #'yas/reload-all
+      :desc "Browse docs"     "?" #'my/yas-browse-docs)
 #+END_SRC
 
 Add a command to open the YASnippet docs.
@@ -317,6 +417,16 @@ Add a command to open the YASnippet docs.
 (defun my/yas-browse-docs ()
   (interactive)
   (browse-url "https://joaotavora.github.io/yasnippet"))
+#+END_SRC
+
+#+BEGIN_SRC elisp
+(defun my/yas-edit-snippet ()
+  (interactive)
+  (call-interactively #'yas/visit-snippet-file))
+
+(defun my/yas-find-snippet ()
+  (interactive)
+  (counsel-find-file nil +snippets-dir))
 #+END_SRC
 
 **** e: Emacs Files
@@ -537,6 +647,24 @@ keybindings specific to =config.org=.
   ("l" my/window-increase-width  "++Width")
   ("ESC" nil "Quit" :color blue))
 #+END_SRC
+*** c: Code
+#+BEGIN_SRC elisp
+(map! :leader
+      :prefix ("c" . "code")
+
+      :desc "Format region/buffer"         "f" #'+format/region-or-buffer
+      :desc "Format imports" "F" #'lsp-organize-imports
+
+      :desc "Rename symbol" "r" #'lsp-rename
+
+      :desc "Show errors list" "x" #'+default/diagnostics
+      :desc "Show errors tree" "X" #'lsp-treemacs-errors-list
+      :desc "Show symbols tree" "s" #'lsp-treemacs-symbols
+
+      :desc "Visit lens" "l" #'lsp-avy-lens
+
+      :desc "Restart LSP" "q" #'lsp-restart-workspace)
+#+END_SRC
 
 ** Local Leader
 *** Org Config
@@ -555,7 +683,31 @@ keybindings specific to =config.org=.
 #+BEGIN_SRC elisp
 (map! :map rustic-mode-map
       :localleader
-      :desc "Debug..." "d" #'my/rust/dap-hydra/body)
+      "b" nil
+      "t" nil)
+
+(map! :map rustic-mode-map
+      :localleader
+      :desc "Edit Cargo.toml" "t" #'my/rust/edit-cargo-toml)
+
+(map! :map rustic-mode-map
+      :leader
+      :prefix ("c" . "code")
+      :desc "Expand macro" "m" #'lsp-rust-analyzer-expand-macro
+      :desc "Open docs" "h" #'lsp-rust-analyzer-open-external-docs)
+
+(map! :map rustic-mode-map
+      :prefix ("cb" . "build")
+
+      :desc "Build" "b" #'rustic-cargo-check
+      :desc "Check" "c" #'rustic-cargo-check
+
+      :desc "Debug" "d" #'my/rust/dap-hydra/body
+      :desc "Run" "r" #'rustic-cargo-run
+
+      :desc "Bench" "B" #'rustic-cargo-bench
+      :desc "Test current" "t" #'rustic-cargo-current-test
+      :desc "Test all" "T" #'rustic-cargo-test)
 
 (map! :map rustic-mode-map
       :desc "Pluralize import" "," #'my/rust/import-pluralize
@@ -563,6 +715,7 @@ keybindings specific to =config.org=.
       :desc "Singularize import" "C-<backspace>" #'my/rust/import-c-singularize)
 #+END_SRC
 
+**** Debugging
 #+BEGIN_SRC elisp
 (defhydra my/rust/dap-hydra (:color pink :hint nil :foreign-keys run)
   "
@@ -604,6 +757,13 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
   ("q" nil "quit" :color blue)
   ("Q" dap-disconnect :color red))
 #+END_SRC
+**** Cargo.toml
+#+BEGIN_SRC elisp
+(map! :map cargo-toml-mode-map
+      :localleader
+      :desc "Add crate (semver)" "a" #'my/rust/cargo-toml-add-crate-semver
+      :desc "Add crate (exact)" "A" #'my/rust/cargo-toml-add-crate)
+#+END_SRC
 
 ** Modes
 *** Evil
@@ -626,7 +786,6 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
 *** Dap
 #+BEGIN_SRC elisp
 #+END_SRC
-
 * Languages
 ** Rust
 *** General
@@ -634,18 +793,29 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
 (add-to-list 'projectile-globally-ignored-files "Cargo.lock")
 #+END_SRC
 
+#+BEGIN_SRC elisp
+(setq lsp-rust-analyzer-inlay-hints-mode t)
+(setq lsp-rust-analyzer-server-display-inlay-hints t)
+
+(setq lsp-rust-analyzer-display-closure-return-type-hints t)
+(setq lsp-rust-analyzer-display-lifetime-elision-hints-enable "skip_trivial")
+(setq lsp-rust-analyzer-display-lifetime-elision-hints-use-parameter-names nil)
+(setq lsp-rust-analyzer-display-chaining-hints t)
+(setq lsp-rust-analyzer-display-reborrow-hints t)
+#+END_SRC
+
 *** Editing
 #+BEGIN_SRC elisp
 (rx-let ((crate (or alphanumeric "_" "*")))
   (setq my//rust/import-singular-rx
         ;; use foo::bar::baz;
-        (rx line-start "use "
+        (rx "use "
             (+ (+ crate) "::")
             (+ crate)
             (? ";") line-end))
   (setq my//rust/import-plural-rx
         ;; use foo::bar::baz::{qux::quo,  };
-        (rx line-start "use "
+        (rx "use "
             (+ (+ crate) "::")
             "{" (* (+ crate) "::") (+ crate) "," (* whitespace) "}"
             (? ";") line-end)))
@@ -760,6 +930,60 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
          (dap-debug))))
 (advice-add #'lsp-rust-analyzer-debug :override #'my/rust/debug-lsp-runnable)
 #+END_SRC
+*** Cargo.toml
+Define a derived mode for =conf-toml-mode= so we can specify some
+keybindings specific to =Cargo.toml= files.
+#+BEGIN_SRC elisp
+(define-derived-mode cargo-toml-mode conf-toml-mode "Cargo.toml mode")
+(add-to-list 'auto-mode-alist '("Cargo\\.toml" . cargo-toml-mode))
+#+END_SRC
+
+Define a wrapper function for visiting the closest Cargo.toml in a new window.
+#+BEGIN_SRC elisp
+(defun my/rust/edit-cargo-toml ()
+  (interactive)
+  (lsp-rust-analyzer-open-cargo-toml t))
+#+END_SRC
+
+Define a helper for pulling the latest versions of crates from crates.io
+#+BEGIN_SRC elisp
+(defun my/rust/get-latest-crate-version (crate callback)
+  (request! (format "https://crates.io/api/v1/crates/%s/versions" crate)
+            (:type "GET" :parser 'json-read)
+            (lambda (data)
+              (let* ((versions (alist-get 'versions data))
+                     (target (elt versions 0))
+                     (num (alist-get 'num target)))
+                (funcall callback num)))
+            (lambda ()
+              (message "Crate not found: %s" crate))))
+
+(defun my/rust/cargo-toml-add-crate (crate)
+  "Insert `crate = version` with the latest available version of a crate."
+  (interactive "sCrate: ")
+  (my/rust/get-latest-crate-version
+   crate
+   (lambda (version)
+     (insert (format "%s = \"%s\"" crate version)))))
+
+(defun my/rust/cargo-toml-add-crate-semver (crate)
+  "Insert `crate = version` with the latest available version of a crate.
+Use any semver compatible version with either the current major release,
+or the minor release if the major version is still 0."
+  (interactive "sCrate: ")
+  (my/rust/get-latest-crate-version
+   crate
+   (lambda (version)
+     (let* ((parts (split-string version "\\."))
+            (major (nth 0 parts))
+            (minor (nth 1 parts))
+            (patch (nth 2 parts))
+            (semver (if (equal major "0")
+                        (format "%s.%s" major minor)
+                      (format "%s" major))))
+      (insert (format "%s = \"%s\"" crate semver))))))
+#+END_SRC
+
 ** Go
 *** Debugging
 Setup: run =M-x dap-go-setup=
@@ -785,18 +1009,6 @@ Setup: run =M-x dap-go-setup=
 
 (setq lsp-headerline-breadcrumb-enable t)
 (setq lsp-headerline-breadcrumb-segments '(symbols))
-#+END_SRC
-
-#+BEGIN_SRC elisp
-(defun my/lsp-ui-doc-open ()
-  (interactive)
-  (lsp-ui-doc-show)
-  (lsp-ui-doc-focus-frame))
-
-(defun my/lsp-ui-doc-close ()
-  (interactive)
-  (lsp-ui-doc-unfocus-frame)
-  (lsp-ui-doc-hide))
 #+END_SRC
 
 ** Counsel Search

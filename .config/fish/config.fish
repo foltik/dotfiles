@@ -16,6 +16,7 @@ end
 
 fish_add_path ~/.local/bin
 fish_add_path ~/.go/bin
+fish_add_path ~/.volta/bin/node
 fish_add_path ~/.spicetify
 
 set -gx TERM xterm-256color
