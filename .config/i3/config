@@ -1,0 +1,109 @@
+set $mod Mod1
+
+set $mon_primary DP-2
+set $mon_right DP-1
+
+bindsym $mod+Shift+r restart
+bindsym $mod+Shift+Ctrl+e exit
+
+bindsym $mod+Shift+q kill
+bindsym $mod+d         exec --no-startup-id rofi -show drun
+bindsym $mod+Shift+d   exec --no-startup-id rofi -show run
+bindsym $mod+backslash exec --no-startup-id alacritty
+bindsym $mod+Shift+e   exec --no-startup-id ~/.emacs.d/bin/doom everywhere
+
+bindsym $mod+q layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+
+bindsym $mod+f fullscreen toggle
+
+floating_modifier $mod
+bindsym $mod+semicolon focus mode_toggle
+bindsym $mod+Shift+semicolon floating toggle
+
+bindsym $mod+h focus left
+bindsym $mod+j focus down
+bindsym $mod+k focus up
+bindsym $mod+l focus right
+bindsym $mod+period focus output left
+
+bindsym $mod+Shift+h move left
+bindsym $mod+Shift+j move down
+bindsym $mod+Shift+k move up
+bindsym $mod+Shift+l move right
+
+bindsym $mod+minus split vertical
+bindsym $mod+equal split horizontal
+
+set $ws0 "0:"
+set $ws1 "1:"
+set $ws2 "2:"
+set $ws3 "3:4"
+set $ws4 "4:5"
+set $ws5 "5:6"
+set $ws6 "6:"
+set $ws7 "7:ﭮ"
+set $ws8 "8:"
+set $ws9 "9:ﱘ"
+
+workspace $ws6 output $mon_right
+workspace $ws7 output $mon_right
+workspace $ws8 output $mon_right
+workspace $ws9 output $mon_right
+
+bindsym $mod+Tab workspace back_and_forth
+bindsym $mod+1 workspace $ws0
+bindsym $mod+2 workspace $ws1
+bindsym $mod+3 workspace $ws2
+bindsym $mod+4 workspace $ws3
+bindsym $mod+5 workspace $ws4
+bindsym $mod+6 workspace $ws5
+bindsym $mod+7 workspace $ws6
+bindsym $mod+8 workspace $ws7
+bindsym $mod+9 workspace $ws8
+bindsym $mod+0 workspace $ws9
+
+bindsym $mod+Shift+1 move container to workspace $ws0
+bindsym $mod+Shift+2 move container to workspace $ws1
+bindsym $mod+Shift+3 move container to workspace $ws2
+bindsym $mod+Shift+4 move container to workspace $ws3
+bindsym $mod+Shift+5 move container to workspace $ws4
+bindsym $mod+Shift+6 move container to workspace $ws5
+bindsym $mod+Shift+7 move container to workspace $ws6
+bindsym $mod+Shift+8 move container to workspace $ws7
+bindsym $mod+Shift+9 move container to workspace $ws8
+bindsym $mod+Shift+0 move container to workspace $ws9
+bindsym $mod+Shift+period move workspace to output left
+
+mode resize {
+    bindsym h resize shrink width 10px or 10ppt
+    bindsym j resize shrink height 10px or 10ppt
+    bindsym k resize grow height 10px or 10ppt
+    bindsym l resize grow width 10px or 10ppt
+
+    bindsym $mod+r mode default
+}
+bindsym $mod+r mode resize
+
+focus_follows_mouse no
+
+font pango:monospace 14px
+default_border pixel 1
+
+set $main   #f5c2e7
+set $urgent #fae3b0
+# class                 border  backgr. text    indicator child_border
+client.focused          #575268 #575268 $main   $main     #575268
+client.focused_inactive #1e1e2e #1e1e2e #888888 $main     #222222
+client.unfocused        #1e1e2e #1e1e2e #888888 $main     #222222
+client.urgent           #1e1e2e #1e1e2e $urgent $main     #900000
+client.placeholder      #1e1e2e #1e1e2e #888888 $main     #222222
+client.background       #1e1e2e
+
+for_window [title="Emacs Everywhere"] floating enable
+
+exec --no-startup-id picom
+exec --no-startup-id clipit
+exec_always --no-startup-id ~/.config/polybar/launch.sh
+exec_always --no-startup-id feh --bg-scale ~/.config/i3/wallpaper.jpg
