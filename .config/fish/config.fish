@@ -40,6 +40,11 @@ function ls; exa $argv; end
 function ll; exa -l $argv; end
 function vim; nvim $argv; end
 
+function k; kubectl $argv; end
+function ka; kubectl $argv --all-namespaces; end
+function kw; watch -n1 "kubectl $argv"; end
+function kx; kubectl config use-context $argv; end
+
 # Dotfiles management
 function dots
     if test (count $argv) -eq 1

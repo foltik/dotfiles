@@ -1,9 +1,8 @@
-(doom-load-envvars-file (concat doom-private-dir "env.el"))
+;;; -*- lexical-binding: t; -*-
+
+(doom-load-envvars-file (concat doom-user-dir "env.el"))
 
 (setq doom-modeline-major-mode-icon t)
-
-(make-variable-buffer-local 'lexical-binding)
-(setq lexical-binding t)
 
 (use-package request
   :commands request)
@@ -53,15 +52,16 @@ returned by `request`."
                      ("TAB" . "<tab>"))))
     (my/replace-regexps-in-string str kbd-regex)))
 
-(setq my//kbd-p nil)
-(defun my/kbd!-p () (eq my//kbd-p t))
+(setq my//vim!-p nil)
+(defun my/vim!-p () (eq my//vim!-p t))
 
-(defun kbd! (str)
+(defun vim! (str)
   "Execute the key sequence defined by STR like a VIM macro."
   (let ((minibuffer-message-timeout 0))
-    (setq my//kbd-p t)
-    (execute-kbd-macro (read-kbd-macro (my/kbd-replace str)))
-    (setq my//kbd-p nil)))
+    (when (not (my/vim!-p))
+      (setq my//vim!-p t)
+      (execute-kbd-macro (read-kbd-macro (my/kbd-replace str)))
+      (setq my//vim!-p nil))))
 
 (defun my/buffer-local-set-key (key fn)
   (let ((mode (intern (format "%s-local-mode"     (buffer-name))))
@@ -100,6 +100,62 @@ returned by `request`."
                       secret)))))
     ,@body))
 
+(defun ts/proxy-on ()
+  (interactive)
+  (setq url-proxy-services
+        '(("http" . "127.0.0.1:20001")
+          ("https" . "127.0.0.1:20001")
+          ("no_proxy" . "^.*twosigma\\.com"))))
+
+(defun ts/proxy-off ()
+  (interactive)
+  (setq url-proxy-services nil))
+
+(setq sourcegraph-url "https://sourcegraph.app.twosigma.com")
+(defun ts/sourcegraph-search ()
+  (interactive)
+  (call-interactively #'sourcegraph-search))
+(defun ts/sourcegraph-browse ()
+  (interactive)
+  (call-interactively #'sourcegraph-open-in-browser))
+
+(setq ts/search-url "https://search.app.twosigma.com/?q=%s")
+(defun ts/search (query)
+  (interactive "sQuery: ")
+  (browse-url (format ts/search-url query)))
+
+(defun ts/repo/root (&optional dir)
+  (locate-dominating-file ($cwd dir) ".base_universe"))
+
+(defun ts/repo/codebase (&optional dir)
+  (locate-dominating-file ($cwd dir) ".git"))
+
+(defun ts/repo/p (&optional dir)
+  (when (ts/repo/root dir) t))
+
+(defun shell! (fmt &rest args)
+  (let* ((cmd (apply #'format (cons fmt args)))
+         (cmd (format "%s 2>/dev/null" cmd))
+         (result (shell-command-to-string cmd))
+         (result (replace-regexp-in-string
+                  "\r?\n$" ""
+                  result)))
+    (if (equal result "")
+        nil
+      result)))
+
+(defun locate! (file &optional dir)
+  (locate-dominating-file ($cwd dir) file))
+
+(defun path! (&rest components)
+  (apply #'f-join components))
+
+(defun $file () buffer-file-name)
+(defun $cwd (&optional dir)
+  (if dir
+      dir
+    (f-dirname ($file))))
+
 (setq doom-theme 'doom-catppuccin)
 
 (setq doom-font                (font-spec :family "monospace" :size 13)
@@ -111,14 +167,27 @@ returned by `request`."
 
 (setq evil-want-fine-undo t)
 
+(defun my/scroll-up ()
+  (interactive)
+  (evil-scroll-line-up 2))
+
+(defun my/scroll-down ()
+  (interactive)
+  (evil-scroll-line-down 2))
+
+(defun my/scroll-up-bigly ()
+  (interactive)
+  (evil-scroll-line-up 5))
+
+(defun my/scroll-down-bigly ()
+  (interactive)
+  (evil-scroll-line-down 5))
+
 (defmacro my//center-cmd (name &rest body)
   `(defun ,name ()
      (interactive)
      ,@body
      (call-interactively #'evil-scroll-line-to-center)))
-
-(my//center-cmd my/scroll-up  (evil-scroll-up evil-scroll-count))
-(my//center-cmd my/scroll-down (evil-scroll-down evil-scroll-count))
 
 (my//center-cmd my/jump-forward  (better-jumper-jump-forward))
 (my//center-cmd my/jump-backward (better-jumper-jump-backward))
@@ -136,7 +205,9 @@ returned by `request`."
 
 (defun my/duplicate-and-comment-line ()
   (interactive)
-  (kbd! "yyp k gcc j"))
+  (vim! "yyp k gcc j"))
+
+(setq search-invisible t)
 
 (defun my/line-numbers-relative ()
   (setq display-line-numbers 'relative))
@@ -166,7 +237,16 @@ returned by `request`."
 
 (setq doom-scratch-initial-major-mode 'lisp-interaction-mode)
 
+(use-package abbrev-mode
+  :hook text-mode)
+
+(setq +abbrev-file (concat doom-user-dir "abbrevs.el"))
+(setq abbrev-file-name +abbrev-file)
+
+
+
 (map! :leader
+      ":" nil
       "b" nil
       "f" nil
       "h" nil
@@ -194,7 +274,7 @@ returned by `request`."
       :desc "Apply code action" :ni "C-/" #'lsp-execute-code-action
 
       :desc "Show definitions" :ni "C-." #'+lookup/definition
-      :desc "Show references" :ni "C->" #'my/lookup/references
+      :desc "Show references" :ni "C->" #'my/lsp/lookup-references
 
       :desc "Jump backward" :ni "C-," #'better-jumper-jump-backward
       :desc "Jump backward" :ni "C-<" #'better-jumper-jump-forward)
@@ -211,10 +291,10 @@ returned by `request`."
  :desc "Save file" "C-s" #'save-buffer)
 
 (map!
- :desc "Scroll page up"   :ni "C-S-k" #'my/scroll-up
- :desc "Scroll page down" :ni "C-S-j" #'my/scroll-down
- :desc "Scroll line up"   :ni "C-k" #'evil-scroll-line-up
- :desc "Scroll line down" :ni "C-j" #'evil-scroll-line-down
+ :desc "Scroll up"         :ni "C-k" #'my/scroll-up
+ :desc "Scroll down"       :ni "C-j" #'my/scroll-down
+ :desc "Scroll up bigly"   :ni "C-S-k" #'my/scroll-up-bigly
+ :desc "Scroll down bigly" :ni "C-S-j" #'my/scroll-down-bigly
 
  :desc "Jump forward"  :n "C-o" #'my/jump-forward
  :desc "Jump backward" :n "C-o" #'my/jump-backward
@@ -266,7 +346,29 @@ returned by `request`."
       :desc "ibuffer" "i" #'ibuffer
 
       :desc "Kill buffer" "d" #'kill-current-buffer
-      :desc "Kill all buffers" "D" #'doom/kill-all-buffers)
+      :desc "Kill all buffers" "D" #'doom/kill-all-buffers
+
+      :desc "Rename buffer" "r" #'my/rename-buffer)
+
+(defun my/rename-buffer (name)
+  (interactive (list (read-string "Rename: " (buffer-name))))
+  (rename-buffer name))
+
+(map! :leader
+      :prefix ("c" . "code")
+
+      :desc "Format region/buffer"         "f" #'+format/region-or-buffer
+      :desc "Format imports" "F" #'lsp-organize-imports
+
+      :desc "Rename symbol" "r" #'lsp-rename
+
+      :desc "Show errors list" "x" #'+default/diagnostics
+      :desc "Show errors tree" "X" #'lsp-treemacs-errors-list
+      :desc "Show symbols tree" "s" #'lsp-treemacs-symbols
+
+      :desc "Visit lens" "l" #'lsp-avy-lens
+
+      :desc "Restart LSP" "q" #'lsp-restart-workspace)
 
 (map! :leader
       :prefix ("f" . "files")
@@ -289,6 +391,62 @@ returned by `request`."
       :desc "Open scratch" "x" #'doom/open-scratch-buffer)
 
 (map! :leader
+      :prefix ("f a" . "abbrevs")
+      :desc "Edit abbrevs"   "e" #'my/abbrev-edit
+      :desc "Reload abbrevs" "r" #'my/abbrev-reload
+
+      :desc "Add global abbrev" "a" #'my/abbrev-add-global
+      :desc "Add mode abbrev"   "m" #'my/abbrev-add-mode)
+
+(defun my/abbrev-edit ()
+  (interactive)
+  (find-file-other-window +abbrev-file))
+
+(defun my/abbrev-reload ()
+  (interactive)
+  (read-abbrev-file +abbrev-file))
+
+(defun my/abbrev-save ()
+  (interactive)
+  (write-abbrev-file +abbrev-file))
+
+(defun my/abbrev-add-global ()
+  (interactive)
+  (call-interactively #'inverse-add-global-abbrev)
+  (my/abbrev-save))
+
+(defun my/abbrev-add-mode ()
+  (interactive)
+  (call-interactively #'inverse-add-mode-abbrev)
+  (my/abbrev-save))
+
+(map! :leader
+      :prefix ("f e" . "emacs")
+      :desc "Find in config" "f" #'doom/find-file-in-private-config
+      :desc "Reload config" "r" #'doom/reload
+
+      :desc "Edit config"   "c" #'my/edit-config
+      :desc "Edit packages" "p" #'my/edit-packages
+      :desc "Edit env"      "e" #'my/edit-env
+      :desc "Edit init"     "i" #'my/edit-init)
+
+(defun my/edit-config ()
+  (interactive)
+  (find-file (concat doom-user-dir "config.org")))
+(defun my/edit-packages ()
+  (interactive)
+  (find-file (concat doom-user-dir "packages.el")))
+(defun my/edit-init ()
+  (interactive)
+  (find-file (concat doom-user-dir "init.el")))
+(defun my/edit-env ()
+  (interactive)
+  (find-file (concat doom-user-dir "env.el")))
+
+(define-derived-mode org-config-mode org-mode "Org config mode")
+(add-to-list 'auto-mode-alist '("config\\.org" . org-config-mode))
+
+(map! :leader
       :prefix ("f s" . "snippets")
       :desc "Find snippet"    "f" #'my/yas-find-snippet
       :desc "New snippet"     "n" #'yas/new-snippet
@@ -309,32 +467,6 @@ returned by `request`."
 (defun my/yas-find-snippet ()
   (interactive)
   (counsel-find-file nil +snippets-dir))
-
-(map! :leader
-      :prefix ("f e" . "emacs")
-      :desc "Find in config" "f" #'doom/find-file-in-private-config
-      :desc "Reload config" "r" #'doom/reload
-
-      :desc "Edit config"   "c" #'my/edit-config
-      :desc "Edit packages" "p" #'my/edit-packages
-      :desc "Edit env"      "e" #'my/edit-env
-      :desc "Edit init"     "i" #'my/edit-init)
-
-(defun my/edit-config ()
-  (interactive)
-  (find-file (concat doom-private-dir "config.org")))
-(defun my/edit-packages ()
-  (interactive)
-  (find-file (concat doom-private-dir "packages.el")))
-(defun my/edit-init ()
-  (interactive)
-  (find-file (concat doom-private-dir "init.el")))
-(defun my/edit-env ()
-  (interactive)
-  (find-file (concat doom-private-dir "env.el")))
-
-(define-derived-mode org-config-mode org-mode "Org config mode")
-(add-to-list 'auto-mode-alist '("config\\.org" . org-config-mode))
 
 (map! :leader
       :prefix ("h" . "help")
@@ -416,6 +548,14 @@ returned by `request`."
       :desc "Doom sandbox" "x" #'doom/sandbox)
 
 (map! :leader
+     :prefix ("l" . "ligma")
+
+     :desc "Search" "s" #'ts/search
+
+     :desc "Sourcegraph search" "g" #'ts/sourcegraph-search
+     :desc "Sourcegraph browse" "G" #'ts/sourcegraph-browse)
+
+(map! :leader
       :prefix ("p" . "projects")
       :desc "Switch project" "p" #'my/projectile-switch-project
       :desc "Add new project" "a" #'projectile-add-known-project
@@ -459,8 +599,10 @@ returned by `request`."
       :desc "Go right" "l" #'evil-window-right
       :desc "Go other" "o" #'other-window
       ;; Layout
-      :desc "Rotate up" "K" #'evil-window-rotate-upwards
-      :desc "Rotate down" "J" #'evil-window-rotate-downwards
+      :desc "Move left" "H" #'+evil/window-move-left
+      :desc "Move down" "J" #'+evil/window-move-down
+      :desc "Move up" "K" #'+evil/window-move-up
+      :desc "Move right" "L" #'+evil/window-move-right
       ;; Splits
       :desc "VSplit" "=" #'+evil/window-vsplit-and-follow
       :desc "HSplit" "-" #'+evil/window-split-and-follow
@@ -469,7 +611,8 @@ returned by `request`."
       :desc "Undo" "u" #'winner-undo
       :desc "Redo" "U" #'winner-redo
       ;; Misc
-      :desc "Resize" "r" #'my/hydra-window-resize/body
+      :desc "Resize..." "r" #'my/hydra-window-resize/body
+      :desc "Rotate..." "R" #'my/hydra-window-rotate/body
       :desc "Balance" "b" #'balance-windows
       ;; Management
       :desc "Kill window" "d" #'+workspace/close-window-or-workspace)
@@ -499,21 +642,16 @@ returned by `request`."
   ("l" my/window-increase-width  "++Width")
   ("ESC" nil "Quit" :color blue))
 
-(map! :leader
-      :prefix ("c" . "code")
-
-      :desc "Format region/buffer"         "f" #'+format/region-or-buffer
-      :desc "Format imports" "F" #'lsp-organize-imports
-
-      :desc "Rename symbol" "r" #'lsp-rename
-
-      :desc "Show errors list" "x" #'+default/diagnostics
-      :desc "Show errors tree" "X" #'lsp-treemacs-errors-list
-      :desc "Show symbols tree" "s" #'lsp-treemacs-symbols
-
-      :desc "Visit lens" "l" #'lsp-avy-lens
-
-      :desc "Restart LSP" "q" #'lsp-restart-workspace)
+(defhydra my/hydra-window-rotate ()
+  "Rotate window"
+  ("h" +evil/window-move-left "Move left")
+  ("j" +evil/window-move-down "Move down")
+  ("k" +evil/window-move-up "Move up")
+  ("l" +evil/window-move-right "Move right")
+  ("H" evil-window-move-far-left "Move far left")
+  ("J" evil-window-rotate-downwards "Rotate Down")
+  ("K" evil-window-rotate-upwards "Rotate Up")
+  ("L" evil-window-move-far-right "Move far right"))
 
 (map! :map org-config-mode-map
       :localleader
@@ -525,38 +663,40 @@ returned by `request`."
   (org-ctrl-c-ctrl-c)
   (org-babel-remove-result))
 
-(map! :map rustic-mode-map
-      :localleader
-      "b" nil
-      "t" nil)
+;; (map! :map rustic-mode-map
+;;       :localleader
+;;       "b" nil
+;;       "t" nil)
 
-(map! :map rustic-mode-map
-      :localleader
-      :desc "Edit Cargo.toml" "t" #'my/rust/edit-cargo-toml)
+;; (map! :map rustic-mode-map
+;;       :localleader
+;;       :desc "Edit Cargo.toml" "t" #'my/rust/edit-cargo-toml)
 
-(map! :map rustic-mode-map
-      :leader
-      :prefix ("c" . "code")
-      :desc "Expand macro" "m" #'lsp-rust-analyzer-expand-macro
-      :desc "Open docs" "h" #'lsp-rust-analyzer-open-external-docs)
+;; (map! :map rustic-mode-map
+;;       :leader
+;;       :prefix ("c" . "code")
+;;       :desc "Expand macro" "m" #'lsp-rust-analyzer-expand-macro
+;;       :desc "Open docs" "h" #'lsp-rust-analyzer-open-external-docs)
 
-(map! :map rustic-mode-map
-      :prefix ("cb" . "build")
+;; (map! :map rustic-mode-map
+;;       :localleader
+;;       :prefix ("b" . "build")
 
-      :desc "Build" "b" #'rustic-cargo-check
-      :desc "Check" "c" #'rustic-cargo-check
+;;       :desc "Build" "b" #'rustic-cargo-check
+;;       :desc "Check" "c" #'rustic-cargo-check
 
-      :desc "Debug" "d" #'my/rust/dap-hydra/body
-      :desc "Run" "r" #'rustic-cargo-run
+;;       :desc "Debug" "d" #'my/rust/dap-hydra/body
+;;       :desc "Run" "r" #'rustic-cargo-run
 
-      :desc "Bench" "B" #'rustic-cargo-bench
-      :desc "Test current" "t" #'rustic-cargo-current-test
-      :desc "Test all" "T" #'rustic-cargo-test)
+;;       :desc "Bench" "B" #'rustic-cargo-bench
+;;       :desc "Test current" "t" #'rustic-cargo-current-test
+;;       :desc "Test all" "T" #'rustic-cargo-test)
 
 (map! :map rustic-mode-map
       :desc "Pluralize import" "," #'my/rust/import-pluralize
       :desc "Singularize import" "<backspace>" #'my/rust/import-singularize
-      :desc "Singularize import" "C-<backspace>" #'my/rust/import-c-singularize)
+      :desc "Singularize import" "C-<backspace>" #'my/rust/import-c-singularize
+      :desc "Singularize import" "C-<delete>" #'my/rust/import-rev-singularize)
 
 (defhydra my/rust/dap-hydra (:color pink :hint nil :foreign-keys run)
   "
@@ -634,41 +774,53 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
             (+ crate)
             (? ";") line-end))
   (setq my//rust/import-plural-rx
-        ;; use foo::bar::baz::{qux::quo,  };
+        ;; use foo::bar::baz::{qux::quo, };
         (rx "use "
             (+ (+ crate) "::")
             "{" (* (+ crate) "::") (+ crate) "," (* whitespace) "}"
+            (? ";") line-end))
+  (setq my//rust/import-plural-rev-rx
+        ;; use foo::bar::baz::{, qux::quo};
+        (rx "use "
+            (+ (+ crate) "::")
+            "{," (* whitespace) (* (+ crate) "::") (+ crate) "}"
             (? ";") line-end)))
 
 (defun my/rust/import-pluralize ()
   "Convert a singular import into a brace-wrapped plural import."
   (interactive)
   (if (and
-       (not (my/kbd!-p))
        (my/insert-mode-p)
        (my/line-match-p my//rust/import-singular-rx))
-      (kbd! "ESC vb S} f} i,")
+      (vim! "ESC vb S} f} i,")
     (insert ",")))
 
 (defun my/rust/import-singularize ()
   "Convert a brace-wrapped plural import into a singular import."
   (interactive)
   (if (and
-       (not (my/kbd!-p))
        (my/insert-mode-p)
        (my/line-match-p my//rust/import-plural-rx))
-      (kbd! "ESC l dF, ds} $i")
+      (vim! "ESC l dF, ds} $i")
     (evil-delete-backward-char-and-join 1)))
 
 (defun my/rust/import-c-singularize ()
   "Convert a brace-wrapped plural import into a singular import."
   (interactive)
   (if (and
-       (not (my/kbd!-p))
        (my/insert-mode-p)
        (my/line-match-p my//rust/import-plural-rx))
-      (kbd! "ESC l dF, ds} $i")
+      (vim! "ESC l dF, ds} $i")
     (backward-kill-word 1)))
+
+(defun my/rust/import-rev-singularize ()
+  "Convert a brace-wrapped plural import into a singular import."
+  (interactive)
+  (if (and
+       (my/insert-mode-p)
+       (my/line-match-p my//rust/import-plural-rev-rx))
+      (vim! "ESC ds} dw $i")
+    (kill-word 1)))
 
 (defun my/rust/debug-config (args)
   (append
@@ -752,7 +904,7 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
 
 (defun my/rust/edit-cargo-toml ()
   (interactive)
-  (lsp-rust-analyzer-open-cargo-toml t))
+  (lsp-rust-analyzer-open-cargo-toml))
 
 (defun my/rust/get-latest-crate-version (crate callback)
   (request! (format "https://crates.io/api/v1/crates/%s/versions" crate)
@@ -790,8 +942,26 @@ or the minor release if the major version is still 0."
                       (format "%s" major))))
       (insert (format "%s = \"%s\"" crate semver))))))
 
+(defun my/rust/cargo-toml (&optional dir)
+  (path! (locate! "Cargo.toml" dir) "Cargo.toml"))
+
+(defun my/rust/workspace-root (&optional dir)
+  (shell! "%s | jq -r '.workspace_root'"
+   (cargo! "metadata --no-deps --format-version 1" dir)))
+
+(defun cargo! (cmd &optional dir)
+  (format "cargo %s --manifest-path \"%s\""
+          cmd
+          (my/rust/cargo-toml dir)))
+
 ;; (setq projectile-project-search-path
 ;;       '("~/Code"))
+
+(defun my/projectile-project-ignored-p (root)
+  (or (doom-project-ignored-p root)
+      (file-in-directory-p root "/opt/ts/fuse/artfs_mounts")
+      (file-in-directory-p root "/home/tsdist/vats_deployments")))
+(setq projectile-ignored-project-function #'my/projectile-project-ignored-p)
 
 (defun my/projectile-switch-project ()
   (interactive)
@@ -806,6 +976,16 @@ or the minor release if the major version is still 0."
 
 (setq lsp-headerline-breadcrumb-enable t)
 (setq lsp-headerline-breadcrumb-segments '(symbols))
+
+(defun my/lsp-root (lsp--calculate-root session file)
+  (or
+   (and (ts/repo/p file)
+        (pcase (f-ext file t)
+          (".rs" (my/rust/workspace-root file))
+          (_ nil)))
+   (lsp--calculate-root session file)))
+
+((advice-add 'lsp--calculate-root :around #'my/lsp-root)
 
 (defun my/counsel-search ()
   (interactive)
@@ -846,6 +1026,10 @@ or the minor release if the major version is still 0."
                    lsp-ui-doc--handle-mouse-movement
                    ignore))
     (add-to-list 'keycast-substitute-alist `(,event nil))))
+
+(use-package sourcegraph
+  :hook (prog-mode . sourcegraph-mode))
+(setq sourcegraph-url "https://sourcegraph.app.twosigma.com")
 
 (load! "lisp/emacs-everywhere.el")
 (setq emacs-everywhere-paste-command '("xdotool" "key" "--clearmodifiers" "ctrl+v"))

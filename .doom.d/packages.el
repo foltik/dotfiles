@@ -59,7 +59,15 @@
 ;; Mode for showing which keys are being pressed on the modeline
 (package! keycast)
 
-;; GitHub Copilot for Emacs
+;; GitHub Copilot for emacs
 (package! copilot
   :recipe (:host github :repo "zerolfx/copilot.el"
            :files ("dist" "copilot.el")))
+
+;; SourceGraph integration
+(package! sourcegraph
+  :recipe (:host github :repo "danielmartin/emacs-sourcegraph"
+           :files ("sourcegraph.el")))
+
+;; Like godbolt for emacs
+(package! rmsbolt)
