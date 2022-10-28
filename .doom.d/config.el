@@ -1,29 +1,12 @@
-#+PROPERTY: header-args:emacs-lisp :lexical t
-#+title: Config
-
-* Setup
-** Lexical Binding
-#+BEGIN_SRC elisp
 ;;; -*- lexical-binding: t; -*-
-#+END_SRC
 
-** Environment Variables
-#+BEGIN_SRC elisp
 (doom-load-envvars-file (concat doom-user-dir "env.el"))
-#+END_SRC
-** Doom configuration
-#+BEGIN_SRC elisp
-(setq doom-modeline-major-mode-icon t)
-#+END_SRC
 
-* Lisp
-** Web
-#+BEGIN_SRC elisp
+(setq doom-modeline-major-mode-icon t)
+
 (use-package request
   :commands request)
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defmacro request! (url plist success &optional error)
   "Makes an HTTP request with `request`, running SUCCESS on success, and
 ERROR on error if specified.
@@ -45,10 +28,7 @@ returned by `request`."
        ,@plist
        :success ,(funcall handler success)
        ,@(if error `(:error ,(funcall handler error))))))
-#+END_SRC
 
-** Editing
-#+BEGIN_SRC elisp
 (defun my/line ()
   (buffer-substring-no-properties
    (line-beginning-position)
@@ -56,17 +36,12 @@ returned by `request`."
 
 (defun my/line-match-p (regexp)
   (string-match-p regexp (my/line)))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun my/insert-mode-p ()
   (eq evil-state 'insert))
 (defun my/normal-mode-p ()
   (eq evil-state 'normal))
-#+END_SRC
 
-** Keybindings
-#+BEGIN_SRC elisp
 (defun my/kbd-replace (str)
   "Convert STR into a keyboard macro string by replacing terminal key sequences with GUI keycodes."
   (let ((kbd-regex '(("ESC" . "<escape>")
@@ -87,10 +62,7 @@ returned by `request`."
       (setq my//vim!-p t)
       (execute-kbd-macro (read-kbd-macro (my/kbd-replace str)))
       (setq my//vim!-p nil))))
-#+END_SRC
 
-
-#+BEGIN_SRC elisp
 (defun my/buffer-local-set-key (key fn)
   (let ((mode (intern (format "%s-local-mode"     (buffer-name))))
         (map  (intern (format "%s-local-mode-map" (buffer-name)))))
@@ -104,10 +76,7 @@ returned by `request`."
     (eval
      `(define-key ,map ,key #',fn))
     (funcall mode t)))
-#+END_SRC
 
-** Regex
-#+BEGIN_SRC elisp
 (defun my/replace-regexps-in-string (str regexps)
   "Replace all pairs of (regex . replacement) defined by REGEXPS in STR."
   (if (null regexps)
@@ -115,9 +84,7 @@ returned by `request`."
     (my/replace-regexps-in-string
      (replace-regexp-in-string (caar regexps) (cdar regexps) str t)
      (cdr regexps))))
-#+END_SRC
-** Auth
-#+BEGIN_SRC elisp
+
 (setq auth-sources '("~/.authinfo.gpg"))
 
 (use-package auth-source :commands auth-source-search)
@@ -132,9 +99,7 @@ returned by `request`."
                         (funcall secret)
                       secret)))))
     ,@body))
-#+END_SRC
-** Two Sigma
-#+BEGIN_SRC elisp
+
 (defun ts/proxy-on ()
   (interactive)
   (setq url-proxy-services
@@ -145,9 +110,7 @@ returned by `request`."
 (defun ts/proxy-off ()
   (interactive)
   (setq url-proxy-services nil))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (setq sourcegraph-url "https://sourcegraph.app.twosigma.com")
 (defun ts/sourcegraph-search ()
   (interactive)
@@ -155,16 +118,12 @@ returned by `request`."
 (defun ts/sourcegraph-browse ()
   (interactive)
   (call-interactively #'sourcegraph-open-in-browser))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (setq ts/search-url "https://search.app.twosigma.com/?q=%s")
 (defun ts/search (query)
   (interactive "sQuery: ")
   (browse-url (format ts/search-url query)))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun ts/repo/root (&optional dir)
   (locate-dominating-file ($cwd dir) ".base_universe"))
 
@@ -173,10 +132,7 @@ returned by `request`."
 
 (defun ts/repo/p (&optional dir)
   (when (ts/repo/root dir) t))
-#+END_SRC
 
-** Magic functions
-#+BEGIN_SRC elisp
 (defun shell! (fmt &rest args)
   (let* ((cmd (apply #'format (cons fmt args)))
          (cmd (format "%s 2>/dev/null" cmd))
@@ -187,52 +143,31 @@ returned by `request`."
     (if (equal result "")
         nil
       result)))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun locate! (file &optional dir)
   (locate-dominating-file ($cwd dir) file))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun path! (&rest components)
   (apply #'f-join components))
-#+END_SRC
 
-** Magic Vars
-#+BEGIN_SRC elisp
 (defun $file () buffer-file-name)
 (defun $ext () (f-ext ($file)))
 (defun $cwd (&optional dir)
   (if dir
       dir
     (f-dirname ($file))))
-#+END_SRC
 
-* Appearance
-Set a nice theme and font.
-#+BEGIN_SRC elisp
 (setq doom-theme 'doom-catppuccin)
 
 (setq doom-font                (font-spec :family "monospace" :size 13)
       doom-big-font            (font-spec :family "monospace" :size 13)
       doom-variable-pitch-font (font-spec :family "sans-serif" :size 13))
-#+END_SRC
 
-Sprinkle in a little background transparency. Instead of making the entire frame
-transparent (including the text) with =alpha=, we use the =alpha-background=
-frame parameter which just landed in the Emacs 29 development branch.
-#+BEGIN_SRC elisp
 (set-frame-parameter (selected-frame) 'alpha-background 85)
 (add-to-list 'default-frame-alist '(alpha-background . 85))
-#+END_SRC
-* Editing
-** Evil
-#+BEGIN_SRC elisp
-(setq evil-want-fine-undo t)
-#+END_SRC
 
-#+BEGIN_SRC elisp
+(setq evil-want-fine-undo t)
+
 (defun my/scroll-up ()
   (interactive)
   (evil-scroll-line-up 2))
@@ -248,10 +183,7 @@ frame parameter which just landed in the Emacs 29 development branch.
 (defun my/scroll-down-bigly ()
   (interactive)
   (evil-scroll-line-down 5))
-#+END_SRC
 
-Auto center the point after jumping.
-#+BEGIN_SRC elisp
 (defmacro my//center-cmd (name &rest body)
   `(defun ,name ()
      (interactive)
@@ -271,39 +203,23 @@ Auto center the point after jumping.
 (my//center-cmd my/forward-section-end (evil-forward-section-end))
 (my//center-cmd my/backward-section-begin (evil-backward-section-begin))
 (my//center-cmd my/backward-section-end (evil-backward-section-end))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun my/duplicate-and-comment-line ()
   (interactive)
   (vim! "yyp k gcc j"))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (setq search-invisible t)
-#+END_SRC
 
-*** Line Numbers
-Use relative line numbers in normal mode, and absolute line numbers in insert
-mode.
-#+BEGIN_SRC emacs-lisp
 (defun my/line-numbers-relative ()
   (setq display-line-numbers 'relative))
 (defun my/line-numbers-absolute ()
   (setq display-line-numbers 'absolute))
 (add-hook 'evil-insert-state-entry-hook #'my/line-numbers-absolute)
 (add-hook 'evil-insert-state-exit-hook #'my/line-numbers-relative)
-#+END_SRC
-*** Undo Tree
-#+BEGIN_SRC elisp
+
 (global-undo-tree-mode)
 (add-hook 'evil-local-mode-hook 'turn-on-undo-tree-mode)
-#+END_SRC
 
-** Copilot
-Add support for GitHub Copilot ([[*Copilot][keybinds]]).
-
-#+BEGIN_SRC elisp
 (use-package copilot
   :commands (copilot-complete))
 
@@ -319,28 +235,17 @@ Add support for GitHub Copilot ([[*Copilot][keybinds]]).
   ("<tab>"     copilot-next-completion     "Next" )
   ("<backtab>" copilot-previous-completion "Prev")
   ("<escape>"  copilot-clear-overlay       "Cancel" :color blue))
-#+END_SRC
-** Scratch
-Use =lisp-interaction-mode= by default for the scratch buffer.
-#+BEGIN_SRC elisp
+
 (setq doom-scratch-initial-major-mode 'lisp-interaction-mode)
-#+END_SRC
-** Abbreviations
-#+BEGIN_SRC elisp
+
 (use-package abbrev-mode
   :hook text-mode)
 
 (setq +abbrev-file (concat doom-user-dir "abbrevs.el"))
 (setq abbrev-file-name +abbrev-file)
-#+END_SRC
 
-* Keybinds
-** Unmaps
-Unmap a bunch of the default keybindings.
-#+BEGIN_SRC elisp
-#+END_SRC
 
-#+BEGIN_SRC elisp
+
 (map! :leader
       ":" nil
       "b" nil
@@ -353,11 +258,7 @@ Unmap a bunch of the default keybindings.
 
 (map! :map evil-org-mode-map
   :n "zc" nil)
-#+END_SRC
 
-** Global
-*** Font Size
-#+BEGIN_SRC elisp
 (map!
  :desc "Increase font size" :ni "C-=" #'text-scale-increase
  :desc "Decrease font size" :ni "C--" #'text-scale-decrease
@@ -366,16 +267,10 @@ Unmap a bunch of the default keybindings.
 (defun my/text-scale-reset ()
   (interactive)
   (text-scale-set 0))
-#+END_SRC
 
-*** Copilot
-#+BEGIN_SRC elisp
 (map!
  :desc "Copilot" :i "C-?" #'my/copilot-complete)
-#+END_SRC
 
-*** LSP
-#+BEGIN_SRC elisp
 (map! :map lsp-mode-map
       :desc "Apply code action" :ni "C-/" #'lsp-execute-code-action
 
@@ -388,23 +283,14 @@ Unmap a bunch of the default keybindings.
 (defun my/lsp/lookup-references ()
   (interactive)
   (lsp-treemacs-references t))
-#+END_SRC
 
-*** Minibuffer
-#+BEGIN_SRC elisp
 (map! :map minibuffer-mode-map
       :desc "Next history" "C-j" #'next-history-element
       :desc "Prev history" "C-k" #'previous-history-element)
-#+END_SRC
 
-*** Files
-#+BEGIN_SRC elisp
 (map!
  :desc "Save file" "C-s" #'save-buffer)
-#+END_SRC
 
-*** Evil
-#+BEGIN_SRC elisp
 (map!
  :desc "Scroll up"         :ni "C-k" #'my/scroll-up
  :desc "Scroll down"       :ni "C-j" #'my/scroll-down
@@ -424,28 +310,17 @@ Unmap a bunch of the default keybindings.
  :desc "Forward section end"   :n "][" #'my/forward-section-end
  :desc "Backward section begin" :n "[]" #'my/backward-section-begin
  :desc "Backward section end"   :n "[[" #'my/backward-section-end)
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (map!
  :desc "Undo tree visualizer" :n "U" #'undo-tree-visualize)
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (map!
  :desc "Duplicate and comment line" :n "gC" #'my/duplicate-and-comment-line)
-#+END_SRC
-** Leader
-*** Root
-**** Eval
-#+BEGIN_SRC elisp
+
 (map! :leader
       :desc "M-x" "x" #'counsel-M-x
       :desc "M-:" ";" #'pp-eval-expression)
-#+END_SRC
 
-**** Files
-#+BEGIN_SRC elisp
 (map! :leader
       :desc "Find file" "." #'counsel-find-file
       :desc "Find dir"  ">" #'+default/dired
@@ -457,23 +332,14 @@ Unmap a bunch of the default keybindings.
   (interactive)
   (projectile-invalidate-cache nil)
   (+ivy/projectile-find-file))
-#+END_SRC
 
-**** Buffers
-#+BEGIN_SRC elisp
 (map! :leader
       :desc "Switch buffer" "," #'+vertico/switch-workspace-buffer
       :desc "Switch all buffers"  "<" #'consult-buffer)
-#+END_SRC
 
-**** Search
-#+BEGIN_SRC elisp
 (map! :leader
       :desc "Search online" "/" #'my/counsel-search)
-#+END_SRC
 
-*** b: Buffers
-#+BEGIN_SRC elisp
 (map! :leader
       :prefix ("b" . "buffers")
 
@@ -484,16 +350,11 @@ Unmap a bunch of the default keybindings.
       :desc "Kill all buffers" "D" #'doom/kill-all-buffers
 
       :desc "Rename buffer" "r" #'my/rename-buffer)
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun my/rename-buffer (name)
   (interactive (list (read-string "Rename: " (buffer-name))))
   (rename-buffer name))
-#+END_SRC
 
-*** c: Code
-#+BEGIN_SRC elisp
 (map! :leader
       :prefix ("c" . "code")
 
@@ -509,9 +370,7 @@ Unmap a bunch of the default keybindings.
       :desc "Visit lens" "l" #'lsp-avy-lens
 
       :desc "Restart LSP" "q" #'lsp-restart-workspace)
-#+END_SRC
-*** f: Files
-#+BEGIN_SRC elisp
+
 (map! :leader
       :prefix ("f" . "files")
 
@@ -531,10 +390,7 @@ Unmap a bunch of the default keybindings.
       :desc "Copy project file path" "Y" #'+default/yank-buffer-path-relative-to-project
 
       :desc "Open scratch" "x" #'doom/open-scratch-buffer)
-#+END_SRC
 
-**** a: Abbrevs
-#+BEGIN_SRC emacs-lisp
 (map! :leader
       :prefix ("f a" . "abbrevs")
       :desc "Edit abbrevs"   "e" #'my/abbrev-edit
@@ -542,9 +398,7 @@ Unmap a bunch of the default keybindings.
 
       :desc "Add global abbrev" "a" #'my/abbrev-add-global
       :desc "Add mode abbrev"   "m" #'my/abbrev-add-mode)
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun my/abbrev-edit ()
   (interactive)
   (find-file-other-window +abbrev-file))
@@ -566,10 +420,7 @@ Unmap a bunch of the default keybindings.
   (interactive)
   (call-interactively #'inverse-add-mode-abbrev)
   (my/abbrev-save))
-#+END_SRC
 
-**** e: Emacs Files
-#+BEGIN_SRC elisp
 (map! :leader
       :prefix ("f e" . "emacs")
       :desc "Find in config" "f" #'doom/find-file-in-private-config
@@ -579,9 +430,7 @@ Unmap a bunch of the default keybindings.
       :desc "Edit packages" "p" #'my/edit-packages
       :desc "Edit env"      "e" #'my/edit-env
       :desc "Edit init"     "i" #'my/edit-init)
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun my/edit-config ()
   (interactive)
   (find-file (concat doom-user-dir "config.org")))
@@ -594,17 +443,10 @@ Unmap a bunch of the default keybindings.
 (defun my/edit-env ()
   (interactive)
   (find-file (concat doom-user-dir "env.el")))
-#+END_SRC
 
-Define a derived mode for editing the literate config so we can specify some
-keybindings specific to =config.org=.
-#+BEGIN_SRC elisp
 (define-derived-mode org-config-mode org-mode "Org config mode")
 (add-to-list 'auto-mode-alist '("config\\.org" . org-config-mode))
-#+END_SRC
 
-**** s: Snippets
-#+BEGIN_SRC emacs-lisp
 (map! :leader
       :prefix ("f s" . "snippets")
       :desc "Find snippet"    "f" #'my/yas-find-snippet
@@ -614,16 +456,11 @@ keybindings specific to =config.org=.
       :desc "Describe snippets" "d" #'yas/describe-tables
       :desc "Reload snippets" "r" #'yas/reload-all
       :desc "Browse docs"     "?" #'my/yas-browse-docs)
-#+END_SRC
 
-Add a command to open the YASnippet docs.
-#+BEGIN_SRC elisp
 (defun my/yas-browse-docs ()
   (interactive)
   (browse-url "https://joaotavora.github.io/yasnippet"))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun my/yas-edit-snippet ()
   (interactive)
   (call-interactively #'yas/visit-snippet-file))
@@ -631,10 +468,7 @@ Add a command to open the YASnippet docs.
 (defun my/yas-find-snippet ()
   (interactive)
   (counsel-find-file nil +snippets-dir))
-#+END_SRC
 
-*** h: Help
-#+BEGIN_SRC elisp
 (map! :leader
       :prefix ("h" . "help")
 
@@ -663,10 +497,7 @@ Add a command to open the YASnippet docs.
 
       :desc "View messages" "e" #'view-echo-area-messages
       :desc "View keystrokes" "l" #'view-lossage)
-#+END_SRC
 
-**** a: Ascii Table
-#+BEGIN_SRC elisp
 (defface my/ascii-table-highlight-face
   '((t (:foreground "pink")))
   "Face for highlighting ASCII chars.")
@@ -702,10 +533,7 @@ Add a command to open the YASnippet docs.
   :side 'right
   :select t
   :width 70)
-#+END_SRC
 
-**** d: Doom
-#+BEGIN_SRC elisp
 (map! :leader
       :prefix ("h d" . "doom")
 
@@ -719,9 +547,7 @@ Add a command to open the YASnippet docs.
 
       :desc "Doom package configuration" "p" #'doom/help-package-config
       :desc "Doom sandbox" "x" #'doom/sandbox)
-#+END_SRC
-*** l: Ligma
-#+BEGIN_SRC elisp
+
 (map! :leader
      :prefix ("l" . "ligma")
 
@@ -729,11 +555,7 @@ Add a command to open the YASnippet docs.
 
      :desc "Sourcegraph search" "g" #'ts/sourcegraph-search
      :desc "Sourcegraph browse" "G" #'ts/sourcegraph-browse)
-#+END_SRC
 
-*** TODO o: Open
-*** p: Projects
-#+BEGIN_SRC elisp
 (map! :leader
       :prefix ("p" . "projects")
       :desc "Switch project" "p" #'my/projectile-switch-project
@@ -751,10 +573,7 @@ Add a command to open the YASnippet docs.
 (defun my/projectile-find-in-root ()
   (interactive)
   (counsel-find-file nil projectile-project-root))
-#+END_SRC
 
-*** t: Toggle
-#+BEGIN_SRC elisp
 (map! :leader
       :prefix ("t" . "toggle")
       ;; Wrap
@@ -767,14 +586,10 @@ Add a command to open the YASnippet docs.
       :desc "Keycast"  "k" #'keycast-mode
       ;; Files
       :desc "Read-only" "r" #'read-only-mode)
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun my/auto-fill-mode (cols)
   (interactive))
-#+END_SRC
-*** w: Window
-#+BEGIN_SRC elisp
+
 (map! :leader
       :prefix-map ("w" . "window")
       ;; Navigation
@@ -804,9 +619,7 @@ Add a command to open the YASnippet docs.
       :desc "Kill window" "d" #'+workspace/close-window-or-workspace)
 ;; TODO: Maybe check out:
 ;; evil-window-mru
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (setq my/window-resize-step 3)
 
 (defun my/window-increase-height ()
@@ -829,9 +642,7 @@ Add a command to open the YASnippet docs.
   ("h" my/window-decrease-width  "--Width")
   ("l" my/window-increase-width  "++Width")
   ("ESC" nil "Quit" :color blue))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defhydra my/hydra-window-rotate ()
   "Rotate window"
   ("h" +evil/window-move-left "Move left")
@@ -842,11 +653,7 @@ Add a command to open the YASnippet docs.
   ("J" evil-window-rotate-downwards "Rotate Down")
   ("K" evil-window-rotate-upwards "Rotate Up")
   ("L" evil-window-move-far-right "Move far right"))
-#+END_SRC
 
-** Local Leader
-*** Org Config
-#+BEGIN_SRC elisp
 (map! :map org-config-mode-map
       :localleader
       :v :desc "Eval Region" "e" #'eval-region
@@ -856,9 +663,7 @@ Add a command to open the YASnippet docs.
   (interactive)
   (org-ctrl-c-ctrl-c)
   (org-babel-remove-result))
-#+END_SRC
-*** Rust
-#+BEGIN_SRC elisp
+
 ;; (map! :map rustic-mode-map
 ;;       :localleader
 ;;       "b" nil
@@ -893,10 +698,7 @@ Add a command to open the YASnippet docs.
       :desc "Singularize import" "<backspace>" #'my/rust/import-singularize
       :desc "Singularize import" "C-<backspace>" #'my/rust/import-c-singularize
       :desc "Singularize import" "C-<delete>" #'my/rust/import-rev-singularize)
-#+END_SRC
 
-**** Debugging
-#+BEGIN_SRC elisp
 (defhydra my/rust/dap-hydra (:color pink :hint nil :foreign-keys run)
   "
 ^Stepping^          ^Switch^                 ^Breakpoints^         ^Debug^                     ^Eval
@@ -936,44 +738,26 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
   ("es" dap-eval-thing-at-point)
   ("q" nil "quit" :color blue)
   ("Q" dap-disconnect :color red))
-#+END_SRC
-**** Cargo.toml
-#+BEGIN_SRC elisp
+
 (map! :map cargo-toml-mode-map
       :localleader
       :desc "Add crate (semver)" "a" #'my/rust/cargo-toml-add-crate-semver
       :desc "Add crate (exact)" "A" #'my/rust/cargo-toml-add-crate)
-#+END_SRC
 
-** Modes
-*** Evil
-**** z
-#+BEGIN_SRC elisp
 (map! :prefix "z"
  :desc "Kill buffer" :n "x" #'kill-current-buffer
  :desc "Kill window" :n "c" #'+workspace/close-window-or-workspace)
-#+END_SRC
 
-**** g
-**** [
-#+BEGIN_SRC elisp
 (map! :prefix "["
       :desc "Start of fn" :n "f" #'beginning-of-defun)
 
 (map! :prefix "]"
       :desc "End of fn" :n "f" #'end-of-defun)
-#+END_SRC
-*** Dap
-#+BEGIN_SRC elisp
-#+END_SRC
-* Languages
-** Rust
-*** General
-#+BEGIN_SRC elisp
-(add-to-list 'projectile-globally-ignored-files "Cargo.lock")
-#+END_SRC
 
-#+BEGIN_SRC elisp
+
+
+(add-to-list 'projectile-globally-ignored-files "Cargo.lock")
+
 (setq lsp-rust-analyzer-inlay-hints-mode t)
 (setq lsp-rust-analyzer-server-display-inlay-hints t)
 
@@ -982,12 +766,7 @@ _Q_: Disconnect     _sd_: Down stack frame   _bh_: Set hit count
 (setq lsp-rust-analyzer-display-lifetime-elision-hints-use-parameter-names nil)
 (setq lsp-rust-analyzer-display-chaining-hints t)
 (setq lsp-rust-analyzer-display-reborrow-hints t)
-#+END_SRC
 
-*** Editing
-When editing a list of "use" imports, automatically add and remove braces when typing or removing commas
-
-#+BEGIN_SRC elisp
 (rx-let ((crate (or alphanumeric "_" "*")))
   (setq my//rust/import-singular-rx
         ;; use foo::bar::baz;
@@ -1043,10 +822,7 @@ When editing a list of "use" imports, automatically add and remove braces when t
        (my/line-match-p my//rust/import-plural-rev-rx))
       (vim! "ESC ds} dw $i")
     (kill-word 1)))
-#+END_SRC
 
-*** Debugging
-#+BEGIN_SRC elisp
 (defun my/rust/debug-config (args)
   (append
    `(:type "lldb-vscode"
@@ -1123,24 +899,14 @@ When editing a list of "use" imports, automatically add and remove braces when t
          (my/rust/debug-config)
          (dap-debug))))
 (advice-add #'lsp-rust-analyzer-debug :override #'my/rust/debug-lsp-runnable)
-#+END_SRC
-*** Cargo.toml
-Define a derived mode for =conf-toml-mode= so we can specify some
-keybindings specific to =Cargo.toml= files.
-#+BEGIN_SRC elisp
+
 (define-derived-mode cargo-toml-mode conf-toml-mode "Cargo.toml mode")
 (add-to-list 'auto-mode-alist '("Cargo\\.toml" . cargo-toml-mode))
-#+END_SRC
 
-Define a wrapper function for visiting the closest Cargo.toml in a new window.
-#+BEGIN_SRC elisp
 (defun my/rust/edit-cargo-toml ()
   (interactive)
   (lsp-rust-analyzer-open-cargo-toml))
-#+END_SRC
 
-Define a helper for pulling the latest versions of crates from crates.io
-#+BEGIN_SRC elisp :lexical t
 (defun my/rust/get-latest-crate-version (crate callback)
   (request! (format "https://crates.io/api/v1/crates/%s/versions" crate)
             (:type "GET" :parser 'json-read)
@@ -1176,9 +942,7 @@ or the minor release if the major version is still 0."
                         (format "%s.%s" major minor)
                       (format "%s" major))))
       (insert (format "%s = \"%s\"" crate semver))))))
-#+END_SRC
-*** Lisp
-#+BEGIN_SRC elisp
+
 (defun my/rust/cargo-toml (&optional dir)
   (path! (locate! "Cargo.toml" dir) "Cargo.toml"))
 
@@ -1190,15 +954,7 @@ or the minor release if the major version is still 0."
   (format "cargo %s --manifest-path \"%s\""
           cmd
           (my/rust/cargo-toml dir)))
-#+END_SRC
 
-** Go
-*** Debugging
-Setup: run =M-x dap-go-setup=
-* Tools
-** Org
-** Projectile
-#+BEGIN_SRC elisp
 ;; (setq projectile-project-search-path
 ;;       '("~/Code"))
 
@@ -1216,17 +972,12 @@ Setup: run =M-x dap-go-setup=
       (unless (file-directory-p project)
         (projectile-remove-known-project project))))
   (call-interactively #'counsel-projectile-switch-project))
-#+END_SRC
 
-** LSP
-#+BEGIN_SRC elisp
 (setq lsp-ui-doc-show-with-mouse t)
 
 (setq lsp-headerline-breadcrumb-enable t)
 (setq lsp-headerline-breadcrumb-segments '(symbols))
-#+END_SRC
 
-#+BEGIN_SRC elisp
 (defun my/lsp-find-root (lsp--find-root-interactively &rest args)
   (or
    (and (ts/repo/p)
@@ -1236,10 +987,7 @@ Setup: run =M-x dap-go-setup=
    (apply lsp--find-root-interactively args)))
 
 (advice-add 'lsp--find-root-interactively :around #'my/lsp-find-root)
-#+END_SRC
 
-** Counsel Search
-#+BEGIN_SRC elisp
 (defun my/counsel-search ()
   (interactive)
   (unless (boundp 'my/kagi-found)
@@ -1256,10 +1004,7 @@ Setup: run =M-x dap-go-setup=
            (setq counsel-search-engine 'kagi))
        (warn "Token for kagi.com not found in authinfo. Falling back to default search engine."))))
   (call-interactively #'counsel-search))
-#+END_SRC
 
-** Keycast
-#+BEGIN_SRC elisp
 (after! keycast
   (define-minor-mode keycast-mode
     "Show current command and its key binding in the mode line."
@@ -1282,22 +1027,14 @@ Setup: run =M-x dap-go-setup=
                    lsp-ui-doc--handle-mouse-movement
                    ignore))
     (add-to-list 'keycast-substitute-alist `(,event nil))))
-#+END_SRC
-** SourceGraph
-#+BEGIN_SRC elisp
+
 (use-package sourcegraph
   :hook (prog-mode . sourcegraph-mode))
 (setq sourcegraph-url "https://sourcegraph.app.twosigma.com")
-#+END_SRC
-** Rmsbolt
 
-* Apps
-** Emacs Everywhere
-#+BEGIN_SRC elisp
 (load! "lisp/emacs-everywhere.el")
 (setq emacs-everywhere-paste-command '("xdotool" "key" "--clearmodifiers" "ctrl+v"))
 (setq emacs-everywhere-frame-parameters
       '((title  . "Emacs Everywhere")
         (width  . 120)
         (height . 36)))
-#+END_SRC
