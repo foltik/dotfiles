@@ -1246,7 +1246,7 @@ Setup: run =M-x dap-go-setup=
 (advice-add 'lsp--find-root-interactively :before-until #'my/lsp-find-root)
 
 (defun my/lsp-buffer-killed ()
-  (when lsp-mode
+  (when (bound-and-true-p lsp-mode)
     (let ((root (lsp-find-session-folder (lsp-session) ($cwd))))
       ;; If we're in an ignored project, remove it from the LSP session
       (when (my/project-ignored-p root)
